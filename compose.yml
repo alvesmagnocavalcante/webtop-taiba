@@ -1,0 +1,193 @@
+name: taiba
+
+services:
+  taiba-vpn:
+    build:
+      context: .
+      dockerfile: Dockerfile.openfortivpn
+    container_name: taiba-vpn
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/ppp:/dev/ppp
+    ports:
+      - "15671:5678"   # n8n Taiba
+      - "13071:3000"   # Semaphore Taiba
+      - "11051:10051"  # Zabbix Server Taiba
+    networks:
+      taiba-net:
+        ipv4_address: 172.31.240.254
+
+  taiba-webtop:
+    image: lscr.io/linuxserver/webtop:ubuntu-xfce
+    container_name: taiba-webtop
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - NET_ADMIN
+    shm_size: "512m"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Fortaleza
+      - TITLE=Taiba - Operacoes
+    ports:
+      - "3011:3000"   # Webtop HTTP
+    volumes:
+      - ./config:/config
+    networks:
+      - taiba-net
+    depends_on:
+      - taiba-zabbix-web
+      - taiba-n8n
+      - taiba-semaphore
+
+  taiba-webtop-route:
+    image: alpine:3.20
+    container_name: taiba-webtop-route
+    restart: unless-stopped
+    network_mode: "service:taiba-webtop"
+    cap_add:
+      - NET_ADMIN
+    command: >
+      sh -c "apk add --no-cache iproute2 &&
+      while true; do
+        ip route replace 10.197.0.0/16 via 172.31.240.254;
+        sleep 300;
+      done"
+    depends_on:
+      - taiba-webtop
+      - taiba-vpn
+
+  taiba-zabbix-postgres:
+    image: postgres:16-alpine
+    container_name: taiba-zabbix-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=zabbix
+      - POSTGRES_PASSWORD=TaibaZabbixSenhaForte2026
+      - POSTGRES_DB=zabbix
+    volumes:
+      - taiba_zabbix_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zabbix -d zabbix"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - taiba-net
+
+  taiba-zabbix-server:
+    image: zabbix/zabbix-server-pgsql:alpine-7.4-latest
+    container_name: taiba-zabbix-server
+    restart: unless-stopped
+    network_mode: "service:taiba-vpn"
+    environment:
+      - DB_SERVER_HOST=taiba-zabbix-postgres
+      - POSTGRES_USER=zabbix
+      - POSTGRES_PASSWORD=TaibaZabbixSenhaForte2026
+      - POSTGRES_DB=zabbix
+    volumes:
+      - taiba_zabbix_data:/var/lib/zabbix
+    depends_on:
+      taiba-vpn:
+        condition: service_started
+      taiba-zabbix-postgres:
+        condition: service_healthy
+
+  taiba-zabbix-web:
+    image: zabbix/zabbix-web-nginx-pgsql:alpine-7.4-latest
+    container_name: taiba-zabbix-web
+    restart: unless-stopped
+    environment:
+      - ZBX_SERVER_HOST=taiba-vpn
+      - DB_SERVER_HOST=taiba-zabbix-postgres
+      - POSTGRES_USER=zabbix
+      - POSTGRES_PASSWORD=TaibaZabbixSenhaForte2026
+      - POSTGRES_DB=zabbix
+      - PHP_TZ=America/Fortaleza
+    ports:
+      - "18071:8080"  # Zabbix Web Taiba
+    networks:
+      - taiba-net
+    depends_on:
+      taiba-zabbix-postgres:
+        condition: service_healthy
+      taiba-zabbix-server:
+        condition: service_started
+
+  taiba-n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: taiba-n8n
+    restart: unless-stopped
+    network_mode: "service:taiba-vpn"
+    environment:
+      - TZ=America/Fortaleza
+      - GENERIC_TIMEZONE=America/Fortaleza
+      - N8N_HOST=10.197.3.2
+      - N8N_LISTEN_ADDRESS=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://10.197.3.2:15671/
+      - N8N_SECURE_COOKIE=false
+    volumes:
+      - taiba_n8n_data:/home/node/.n8n
+    depends_on:
+      taiba-vpn:
+        condition: service_started
+
+  taiba-semaphore-postgres:
+    image: postgres:16-alpine
+    container_name: taiba-semaphore-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=semaphore
+      - POSTGRES_PASSWORD=TaibaSemaphoreSenhaForte2026
+      - POSTGRES_DB=semaphore
+    volumes:
+      - taiba_semaphore_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U semaphore -d semaphore"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - taiba-net
+
+  taiba-semaphore:
+    image: semaphoreui/semaphore:latest
+    container_name: taiba-semaphore
+    restart: unless-stopped
+    network_mode: "service:taiba-vpn"
+    environment:
+      - SEMAPHORE_DB_DIALECT=postgres
+      - SEMAPHORE_DB_HOST=taiba-semaphore-postgres
+      - SEMAPHORE_DB_PORT=5432
+      - SEMAPHORE_DB_USER=semaphore
+      - SEMAPHORE_DB_PASS=TaibaSemaphoreSenhaForte2026
+      - SEMAPHORE_DB=semaphore
+      - SEMAPHORE_ADMIN=admin
+      - SEMAPHORE_ADMIN_PASSWORD=admin123
+      - SEMAPHORE_ADMIN_NAME=Admin
+      - SEMAPHORE_ADMIN_EMAIL=admin@localhost
+      - SEMAPHORE_ACCESS_KEY_ENCRYPTION=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      - TZ=America/Fortaleza
+    depends_on:
+      taiba-vpn:
+        condition: service_started
+      taiba-semaphore-postgres:
+        condition: service_healthy
+
+networks:
+  taiba-net:
+    name: taiba-net
+    ipam:
+      config:
+        - subnet: 172.31.240.0/24
+
+volumes:
+  taiba_zabbix_pg_data:
+  taiba_zabbix_data:
+  taiba_n8n_data:
+  taiba_semaphore_pg_data:
