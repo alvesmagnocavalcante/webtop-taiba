@@ -138,47 +138,25 @@ services:
       taiba-vpn:
         condition: service_started
 
-  taiba-semaphore-postgres:
-    image: postgres:16-alpine
-    container_name: taiba-semaphore-postgres
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=semaphore
-      - POSTGRES_PASSWORD=TaibaSemaphoreSenhaForte2026
-      - POSTGRES_DB=semaphore
-    volumes:
-      - taiba_semaphore_pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U semaphore -d semaphore"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      - taiba-net
-
   taiba-semaphore:
     image: semaphoreui/semaphore:latest
     container_name: taiba-semaphore
     restart: unless-stopped
     network_mode: "service:taiba-vpn"
     environment:
-      - SEMAPHORE_DB_DIALECT=postgres
-      - SEMAPHORE_DB_HOST=taiba-semaphore-postgres
-      - SEMAPHORE_DB_PORT=5432
-      - SEMAPHORE_DB_USER=semaphore
-      - SEMAPHORE_DB_PASS=TaibaSemaphoreSenhaForte2026
-      - SEMAPHORE_DB=semaphore
+      - SEMAPHORE_DB_DIALECT=bolt
+      - SEMAPHORE_DB_HOST=/var/lib/semaphore/database.boltdb
       - SEMAPHORE_ADMIN=admin
       - SEMAPHORE_ADMIN_PASSWORD=admin123
       - SEMAPHORE_ADMIN_NAME=Admin
       - SEMAPHORE_ADMIN_EMAIL=admin@localhost
       - SEMAPHORE_ACCESS_KEY_ENCRYPTION=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
       - TZ=America/Fortaleza
+    volumes:
+      - taiba_semaphore_data:/var/lib/semaphore
     depends_on:
       taiba-vpn:
         condition: service_started
-      taiba-semaphore-postgres:
-        condition: service_healthy
 
 networks:
   taiba-net:
@@ -191,4 +169,4 @@ volumes:
   taiba_zabbix_pg_data:
   taiba_zabbix_data:
   taiba_n8n_data:
-  taiba_semaphore_pg_data:
+  taiba_semaphore_data:
