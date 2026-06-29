@@ -1,5 +1,3 @@
-name: taiba
-
 services:
   taiba-vpn:
     build:
@@ -19,7 +17,7 @@ services:
         ipv4_address: 172.30.240.254
 
   taiba-webtop:
-    image: lscr.io/linuxserver/webtop:ubuntu-xfce
+    image: lscr.io/linuxserver/webtop:latest
     container_name: taiba-webtop
     restart: unless-stopped
     security_opt:
@@ -33,8 +31,8 @@ services:
       - TZ=America/Fortaleza
       - TITLE=Taiba - Operacoes
     ports:
-      - "10.197.3.2:3011:3000"   # Webtop HTTP
-      - "10.197.3.2:3012:3001"   # Webtop HTTPS
+      - "3011:3000"   # Webtop HTTP
+      - "3012:3001"   # Webtop HTTPS
     volumes:
       - ./config:/config
     networks:
@@ -144,8 +142,8 @@ services:
     restart: unless-stopped
     network_mode: "service:taiba-vpn"
     environment:
-      - SEMAPHORE_DB_DIALECT=bolt
-      - SEMAPHORE_DB_HOST=/var/lib/semaphore/database.boltdb
+      - SEMAPHORE_DB_DIALECT=sqlite
+      - SEMAPHORE_DB_HOST=/var/lib/semaphore/database.sqlite
       - SEMAPHORE_ADMIN=admin
       - SEMAPHORE_ADMIN_PASSWORD=admin123
       - SEMAPHORE_ADMIN_NAME=Admin
