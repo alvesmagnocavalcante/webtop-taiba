@@ -1,0 +1,26 @@
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* && \
+    apt-get update \
+      -o Acquire::Retries=5 \
+      -o Acquire::http::No-Cache=true \
+      -o Acquire::https::No-Cache=true && \
+    apt-get install -y --no-install-recommends --fix-missing \
+      openfortivpn \
+      iproute2 \
+      iptables \
+      iputils-ping \
+      ca-certificates \
+      ppp \
+      bash && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+COPY vpn/taiba-openfortivpn.conf /etc/openfortivpn/config
+COPY vpn/start-openfortivpn.sh /usr/local/bin/start-openfortivpn.sh
+
+RUN chmod +x /usr/local/bin/start-openfortivpn.sh
+
+CMD ["/usr/local/bin/start-openfortivpn.sh"]
