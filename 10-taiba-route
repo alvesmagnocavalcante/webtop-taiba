@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv bash
+set -e
+
+ip route replace 10.197.0.0/16 via 172.31.240.254 || true
