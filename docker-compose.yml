@@ -15,6 +15,10 @@ services:
     networks:
       taiba-net:
         ipv4_address: 172.31.240.254
+        aliases:
+          - n8n
+          - semaphore
+          - zabbix-server
 
   taiba-webtop:
     image: lscr.io/linuxserver/webtop:latest
@@ -108,7 +112,9 @@ services:
     ports:
       - "18071:8080"  # Zabbix Web Taiba
     networks:
-      - taiba-net
+      taiba-net:
+        aliases:
+          - zabbix
     depends_on:
       taiba-zabbix-postgres:
         condition: service_healthy
