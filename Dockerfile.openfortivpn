@@ -18,8 +18,8 @@ RUN apt-get clean && \
       bash && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
-COPY taiba-openfortivpn.conf /etc/openfortivpn/config
-COPY start-openfortivpn.sh /usr/local/bin/start-openfortivpn.sh
+COPY vpn/taiba-openfortivpn.conf /etc/openfortivpn/config
+COPY vpn/start-openfortivpn.sh /usr/local/bin/start-openfortivpn.sh
 
 RUN chmod +x /usr/local/bin/start-openfortivpn.sh
 

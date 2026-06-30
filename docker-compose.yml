@@ -14,7 +14,7 @@ services:
       - "11051:10051"  # Zabbix Server Taiba
     networks:
       taiba-net:
-        ipv4_address: 172.30.240.254
+        ipv4_address: 172.31.240.254
 
   taiba-webtop:
     image: lscr.io/linuxserver/webtop:latest
@@ -32,7 +32,6 @@ services:
       - TITLE=Taiba - Operacoes
     ports:
       - "3011:3000"   # Webtop HTTP
-      - "3012:3001"   # Webtop HTTPS
     volumes:
       - ./config:/config
     networks:
@@ -52,7 +51,7 @@ services:
     command: >
       sh -c "apk add --no-cache iproute2 &&
       while true; do
-        ip route replace 10.197.0.0/22 via 172.30.240.254;
+        ip route replace 10.197.0.0/16 via 172.31.240.254;
         sleep 300;
       done"
     depends_on:
@@ -124,11 +123,11 @@ services:
     environment:
       - TZ=America/Fortaleza
       - GENERIC_TIMEZONE=America/Fortaleza
-      - N8N_HOST=10.197.3.2
+      - N8N_HOST=10.197.0.85
       - N8N_LISTEN_ADDRESS=0.0.0.0
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://10.197.3.2:15671/
+      - WEBHOOK_URL=http://10.197.0.85:15671/
       - N8N_SECURE_COOKIE=false
     volumes:
       - taiba_n8n_data:/home/node/.n8n
@@ -136,35 +135,57 @@ services:
       taiba-vpn:
         condition: service_started
 
+  taiba-semaphore-postgres:
+    image: postgres:16-alpine
+    container_name: taiba-semaphore-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=semaphore
+      - POSTGRES_PASSWORD=TaibaSemaphoreSenhaForte2026
+      - POSTGRES_DB=semaphore
+    volumes:
+      - taiba_semaphore_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U semaphore -d semaphore"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - taiba-net
+
   taiba-semaphore:
     image: semaphoreui/semaphore:latest
     container_name: taiba-semaphore
     restart: unless-stopped
     network_mode: "service:taiba-vpn"
     environment:
-      - SEMAPHORE_DB_DIALECT=sqlite
-      - SEMAPHORE_DB_HOST=/var/lib/semaphore/database.sqlite
+      - SEMAPHORE_DB_DIALECT=postgres
+      - SEMAPHORE_DB_HOST=taiba-semaphore-postgres
+      - SEMAPHORE_DB_PORT=5432
+      - SEMAPHORE_DB_USER=semaphore
+      - SEMAPHORE_DB_PASS=TaibaSemaphoreSenhaForte2026
+      - SEMAPHORE_DB=semaphore
       - SEMAPHORE_ADMIN=admin
       - SEMAPHORE_ADMIN_PASSWORD=admin123
       - SEMAPHORE_ADMIN_NAME=Admin
       - SEMAPHORE_ADMIN_EMAIL=admin@localhost
       - SEMAPHORE_ACCESS_KEY_ENCRYPTION=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
       - TZ=America/Fortaleza
-    volumes:
-      - taiba_semaphore_data:/var/lib/semaphore
     depends_on:
       taiba-vpn:
         condition: service_started
+      taiba-semaphore-postgres:
+        condition: service_healthy
 
 networks:
   taiba-net:
     name: taiba-net
     ipam:
       config:
-        - subnet: 172.30.240.0/24
+        - subnet: 172.31.240.0/24
 
 volumes:
   taiba_zabbix_pg_data:
   taiba_zabbix_data:
   taiba_n8n_data:
-  taiba_semaphore_data:
+  taiba_semaphore_pg_data:
